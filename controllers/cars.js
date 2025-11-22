@@ -1,68 +1,9 @@
 const mongoose = require('mongoose');
 const Car = require('../models/Car')
 const Review = require('../models/Review')
+const Booking = require('../models/Booking')
 const handleValidationError = require('../utils/handlerValidate')
 const logError = require('../utils/logger');
-
-exports.getCarRecommendations = async (req, res) => {
-    try {
-        const userId = req.user._id;
-
-        // 1️⃣ User's top booked cars
-        const userBookings = await Booking.aggregate([
-            { $match: { user: mongoose.Types.ObjectId(userId), status: { $in: ['Confirmed', 'Completed'] } } },
-            { $group: { _id: '$car', count: { $sum: 1 } } },
-            { $sort: { count: -1 } },
-            { $limit: 5 }
-        ]);
-        const favoriteCarIds = userBookings.map(b => b._id);
-
-        // 2️⃣ Popular cars overall (most booked)
-        const popularBookings = await Booking.aggregate([
-            { $match: { status: { $in: ['Confirmed', 'Completed'] } } },
-            { $group: { _id: '$car', totalBookings: { $sum: 1 } } },
-            { $sort: { totalBookings: -1 } },
-            { $limit: 5 }
-        ]);
-        const popularCarIds = popularBookings.map(b => b._id);
-
-        // 3️⃣ Top rated cars
-        const topRated = await Review.aggregate([
-            { $group: { _id: '$car', avgRating: { $avg: '$rating' }, reviewCount: { $sum: 1 } } },
-            { $sort: { avgRating: -1, reviewCount: -1 } },
-            { $limit: 5 }
-        ]);
-        const topRatedIds = topRated.map(r => r._id);
-
-        // 4️⃣ Similar cars to favorites (same brand/type/fuel/seats)
-        const favoriteCars = await Car.find({ _id: { $in: favoriteCarIds } });
-        const similarCars = await Car.find({
-            _id: { $nin: [...favoriteCarIds, ...popularCarIds, ...topRatedIds] },
-            $or: [
-                { brand: { $in: favoriteCars.map(c => c.brand) } },
-                { type: { $in: favoriteCars.map(c => c.type) } },
-                { fuel: { $in: favoriteCars.map(c => c.fuel) } },
-                { seats: { $in: favoriteCars.map(c => c.seats) } },
-            ]
-        }).limit(5);
-
-        // Merge all recommended car IDs and fetch full details
-        const allIds = [...new Set([...favoriteCarIds, ...popularCarIds, ...topRatedIds, ...similarCars.map(c => c._id)])];
-        const recommendedCars = await Car.find({ _id: { $in: allIds } })
-            .populate('reviews', 'rating user')
-            .limit(20); // final cap
-
-        res.status(200).json({
-            success: true,
-            msg: 'Car Recommendations',
-            data: recommendedCars
-        });
-
-    } catch (error) {
-        logError(error, req, 'Get Car Recommendations');
-        res.status(500).json({ success: false, msg: 'Internal server error' });
-    }
-};
 
 exports.getCars = async (req, res) => {
     try {
@@ -72,7 +13,7 @@ exports.getCars = async (req, res) => {
 
         const query = {};
 
-        // --- Search keywords like Amazon/Shopee ---
+        // --- Search keywords ---
         if (req.query.search) {
             const keywords = req.query.search.split(' ').filter(k => k.trim() !== '');
             query.$and = keywords.map(keyword => ({
@@ -100,57 +41,8 @@ exports.getCars = async (req, res) => {
         const cars = await Car.find(query)
             .skip(skip)
             .limit(limit)
-            .sort({ createdAt: -1 }); // newest first
-
-        // --- Personalized Recommendations ---
-        let recommendations = {};
-        if (req.user) {
-            const userId = req.user._id;
-
-            // 1. User favorite cars (most booked)
-            const favoriteBookings = await Booking.aggregate([
-                { $match: { user: mongoose.Types.ObjectId(userId), status: { $in: ['Confirmed', 'Completed'] } } },
-                { $group: { _id: '$car', count: { $sum: 1 } } },
-                { $sort: { count: -1 } },
-                { $limit: 5 }
-            ]);
-            const favoriteCarIds = favoriteBookings.map(b => b._id);
-            const favoriteCars = await Car.find({ _id: { $in: favoriteCarIds } });
-
-            // 2. Popular cars overall (trending)
-            const popularBookings = await Booking.aggregate([
-                { $match: { status: { $in: ['Confirmed', 'Completed'] } } },
-                { $group: { _id: '$car', total: { $sum: 1 } } },
-                { $sort: { total: -1 } },
-                { $limit: 5 }
-            ]);
-            const popularCarIds = popularBookings.map(b => b._id);
-            const popularCars = await Car.find({ _id: { $in: popularCarIds } });
-
-            // 3. Similar cars to favorites (brand/type)
-            const favoriteTypes = await Car.find({ _id: { $in: favoriteCarIds } }).distinct('type');
-            const favoriteBrands = await Car.find({ _id: { $in: favoriteCarIds } }).distinct('brand');
-
-            const similarCars = await Car.find({
-                _id: { $nin: favoriteCarIds },
-                $or: [
-                    { type: { $in: favoriteTypes } },
-                    { brand: { $in: favoriteBrands } }
-                ]
-            }).limit(5);
-
-            // 4. Recently trending cars (last 7 days bookings)
-            const recentTrending = await Booking.aggregate([
-                { $match: { status: { $in: ['Confirmed', 'Completed'] }, createdAt: { $gte: new Date(Date.now() - 7*24*60*60*1000) } } },
-                { $group: { _id: '$car', recentCount: { $sum: 1 } } },
-                { $sort: { recentCount: -1 } },
-                { $limit: 5 }
-            ]);
-            const trendingCarIds = recentTrending.map(b => b._id);
-            const trendingCars = await Car.find({ _id: { $in: trendingCarIds } });
-
-            recommendations = { favoriteCars, popularCars, similarCars, trendingCars };
-        }
+            .sort({ createdAt: -1 })
+            .populate('provider_ids', 'name email phone address'); // <-- populate provider info
 
         res.status(200).json({
             success: true,
@@ -162,8 +54,7 @@ exports.getCars = async (req, res) => {
                 page,
                 limit,
                 totalPages: Math.ceil(total / limit)
-            },
-            recommendations
+            }
         });
 
     } catch (error) {
@@ -180,16 +71,19 @@ exports.getCar = async (req, res) => {
             return res.status(400).json({ success: false, msg: 'Invalid car ID' });
         }
 
-        const car = await Car.findById(id);
+        const car = await Car.findById(id)
+            .populate('provider_ids', 'name email phone address'); // <-- populate provider info
+
         if (!car) {
             return res.status(404).json({ success: false, msg: 'Car not found' });
         }
+
         res.status(200).json({ success: true, msg: 'Get My Car', data: car });
     } catch (error) {
         logError(error, req, 'Get Car');
         res.status(500).json({ success: false, msg: 'Internal server error' });
     }
-}
+};
 
 exports.createCar = async (req, res) => {
     try {

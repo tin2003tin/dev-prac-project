@@ -9,15 +9,19 @@ const carSchema = new mongoose.Schema({
     fuel: { type: String, enum: ['Petrol', 'Diesel', 'Electric', 'Hybrid'], required: true },
     transmission: { type: String, enum: ['Manual', 'Automatic'], required: true },
 
+    provider_ids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Provider' }],
+
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
 
+// Update updatedAt on save
 carSchema.pre('save', function(next) {
     this.updatedAt = Date.now();
     next();
 });
 
+// Update updatedAt on findOneAndUpdate
 carSchema.pre('findOneAndUpdate', function(next) {
     this.set({ updatedAt: Date.now() });
     next();

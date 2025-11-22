@@ -1,6 +1,6 @@
 @startuml
 left to right direction
-skinparam packageStyle rect
+skinparam packageStyle rectangle
 skinparam actorStyle awesome
 
 actor User as U
@@ -8,43 +8,35 @@ actor Admin as A
 
 rectangle "Rental Car Booking System" {
 
-  package "Authentication" {
-    (Register) as UC1
-    (Login) as UC2
-    (Logout) as UC3
-  }
+    package "Authentication" {
+        (Register) as UC1
+        (Login) as UC2
+        (Logout) as UC3
+    }
 
-  package "Car Browsing" {
-    (View Cars) as UC4
-    (View Car Details) as UC5
-  }
+    package "Car Browsing" {
+        (View Cars) as UC4
+        (View Car Details) as UC5
+    }
 
-  package "Booking Management" {
-    (Create Booking) as UC6
-    (View My Bookings) as UC7
-    (Update Booking Status) as UC8
-    (Cancel/Delete Booking) as UC9
-  }
+    package "Booking Management" {
+        (Create Booking) as UC6
+        (View My Bookings) as UC7
+        (Update Booking Status) as UC8
+        (Cancel/Delete Booking) as UC9
+    }
 
-  package "Reviews" {
-    (Add Car Review) as UC10
-    (View Car Reviews) as UC11
-    (View All Reviews) as UC12
-    (Update My Review) as UC13
-    (Delete My Review) as UC14
-  }
+    package "User Profile" {
+        (Get My Profile) as UC15
+        (Get Favorite Car Specs) as UC16
+        (Set Favorite Car Specs) as UC17
+    }
 
-  package "User Profile" {
-    (Get My Profile) as UC15
-    (Get Favorite Car Specs) as UC16
-    (Set Favorite Car Specs) as UC17
-  }
-
-  package "Admin Car Management" {
-    (Create Car) as UC18
-    (Update Car) as UC19
-    (Delete Car) as UC20
-  }
+    package "Admin Car Management" {
+        (Create Car) as UC18
+        (Update Car) as UC19
+        (Delete Car) as UC20
+    }
 }
 
 ' ---------------- USER ----------------
@@ -60,23 +52,20 @@ U --> UC7
 U --> UC8
 U --> UC9
 
-U --> UC10
-U --> UC11
-U --> UC12
-U --> UC13
-U --> UC14
-
 U --> UC15
 U --> UC16
 U --> UC17
 
 ' ---------------- ADMIN ----------------
+A --> UC2
+A --> UC3
+
 A --> UC18
 A --> UC19
 A --> UC20
 
-A --> UC6 : "Approve"
-A --> UC8 : "Update Status"
-A --> UC9 : "Delete Booking"
+A --> UC6
+A --> UC8
+A --> UC9
 
 @enduml

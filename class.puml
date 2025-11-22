@@ -1,7 +1,12 @@
-`@startuml
+@startuml
 skinparam classAttributeIconSize 0
 skinparam dpi 240
 scale 1.5
+
+' --------------------------
+' Layout direction
+' --------------------------
+left to right direction
 
 ' ===========================
 ' CLASSES
@@ -37,27 +42,26 @@ class Booking {
   +_id: ObjectId
   +user: ObjectId
   +car: ObjectId
+  +provider: ObjectId
   +dateFrom: Date
   +dateTo: Date
   +status: string
   
   +createBooking()
+  +updateBooking()
   +updateBookingStatus()
   +deleteBooking()
   +getMyBookings()
 }
 
-class Review {
+class Provider {
   +_id: ObjectId
-  +user: ObjectId
-  +car: ObjectId
-  +rating: number
-  +comment: string
+  +name: string
+  +email: string
+  +phone: string
+  +address: string
   
-  +addReview()
-  +updateReview()
-  +deleteReview()
-  +getReviews()
+  +getProviders()
 }
 
 class Auth {
@@ -70,24 +74,10 @@ class Auth {
 ' RELATIONSHIPS
 ' ===========================
 
-' User has many Bookings
 User "1" --> "0..*" Booking : books >
-
-' User writes many Reviews
-User "1" --> "0..*" Review : writes >
-
-' Car receives many Bookings
 Car "1" --> "0..*" Booking : reserved in >
-
-' Car receives many Reviews
-Car "1" --> "0..*" Review : reviewed in >
-
-' Review belongs to Car and User
-Review --> Car
-Review --> User
-
-' Booking belongs to Car and User
 Booking --> Car
 Booking --> User
+Booking --> Provider
 
 @enduml

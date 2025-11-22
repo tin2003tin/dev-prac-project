@@ -26,6 +26,8 @@ exports.getBookings = async (req, res) => {
             .limit(limit)
             .sort({ createdAt: -1 })
             .populate('user', 'name tel email')
+            .populate('car', 'name brand model pricePerDay')
+            .populate('provider', 'name address tel');
 
         res.status(200).json({
             success: true,
@@ -59,6 +61,8 @@ exports.getBooking = async (req, res) => {
 
         const booking = await Booking.findById(id)
             .populate('user', 'name tel email')
+            .populate('car', 'name brand model pricePerDay')
+            .populate('provider', 'name address tel');
 
         if (!booking) return res.status(404).json({ success: false, msg: 'Booking not found' });
 
@@ -99,6 +103,11 @@ exports.createBooking = async (req, res) => {
         const provider = await Provider.findById(provider_id);
         if (!provider) return res.status(404).json({ success: false, msg: 'Provider not found' });
 
+        // 🔹 Check if provider belongs to car
+        if (!car.provider_ids.includes(provider._id)) {
+            return res.status(400).json({ success: false, msg: 'Provider does not provide this car' });
+        }
+
         // Validate dates
         const start = new Date(startDate);
         const end = new Date(endDate);
@@ -115,23 +124,18 @@ exports.createBooking = async (req, res) => {
             return res.status(403).json({ success: false, msg: 'Maximum 3 active bookings allowed' });
         }
 
-        // 🔹 Check if the same user already has a pending booking for the same car
+        // Check duplicate pending booking
         const pendingBooking = await Booking.findOne({
             user: req.user._id,
             car: car._id,
             status: 'Pending'
         });
-
         if (pendingBooking) {
             return res.status(409).json({
                 success: false,
                 msg: 'You already have a pending booking for this car'
             });
         }
-
-        // Calculate totalPrice
-        const dayCount = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-        const totalPrice = car.pricePerDay * dayCount;
 
         // Create booking
         const booking = await Booking.create({
@@ -140,11 +144,9 @@ exports.createBooking = async (req, res) => {
             provider: provider._id,
             startDate: start,
             endDate: end,
-            totalPrice,
             status: 'Pending'
         });
 
-        // Populate for response
         const populatedBooking = await Booking.findById(booking._id)
             .populate('user', 'name email')
             .populate('car', 'name brand model')
@@ -178,11 +180,28 @@ exports.updateBooking = async (req, res) => {
             return res.status(403).json({ success: false, msg: 'Access denied' });
         }
 
-        // Prevent updating status
-        const { status, ...updateFields } = req.body;
+        const { provider_id, ...updateFields } = req.body;
 
-        // Update other fields
-        Object.assign(booking, updateFields);
+        // 🔹 If provider_id is updated, check provider belongs to car
+        if (provider_id) {
+            if (!mongoose.Types.ObjectId.isValid(provider_id)) {
+                return res.status(400).json({ success: false, msg: 'Invalid provider ID' });
+            }
+
+            const provider = await Provider.findById(provider_id);
+            if (!provider) return res.status(404).json({ success: false, msg: 'Provider not found' });
+
+            const car = await Car.findById(booking.car);
+            if (!car.provider_ids.includes(provider._id)) {
+                return res.status(400).json({ success: false, msg: 'Provider does not provide this car' });
+            }
+
+            updateFields.provider = provider._id; // assign valid provider
+        }
+
+        // Prevent updating status
+        const { status, ...fields } = updateFields;
+        Object.assign(booking, fields);
         await booking.save();
 
         const updatedBooking = await Booking.findById(id)
@@ -196,7 +215,6 @@ exports.updateBooking = async (req, res) => {
         res.status(500).json({ success: false, msg: 'Internal server error' });
     }
 };
-
 
 /**
  * Update booking status
