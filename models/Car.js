@@ -8,16 +8,6 @@ const carSchema = new mongoose.Schema({
     seats: { type: Number, required: true },
     fuel: { type: String, enum: ['Petrol', 'Diesel', 'Electric', 'Hybrid'], required: true },
     transmission: { type: String, enum: ['Manual', 'Automatic'], required: true },
-    pricePerDay: { type: Number, required: true },
-    available: { type: Boolean, default: true },
-    images: [{ type: String, maxlength: 200 }],
-
-    // Rental provider info
-    provider: {
-        name: { type: String, required: true, maxlength: 100 },
-        address: { type: String, required: true, maxlength: 200 },
-        tel: { type: String, required: true, maxlength: 20 }
-    },
 
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }

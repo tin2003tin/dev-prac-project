@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Booking = require('../models/Booking');
+const Provider = require('../models/Provider');
 const Car = require('../models/Car');
 const logError = require('../utils/logger');
 
@@ -25,7 +26,6 @@ exports.getBookings = async (req, res) => {
             .limit(limit)
             .sort({ createdAt: -1 })
             .populate('user', 'name tel email')
-            .populate('car', 'name brand model pricePerDay');
 
         res.status(200).json({
             success: true,
@@ -59,7 +59,6 @@ exports.getBooking = async (req, res) => {
 
         const booking = await Booking.findById(id)
             .populate('user', 'name tel email')
-            .populate('car', 'name brand model pricePerDay');
 
         if (!booking) return res.status(404).json({ success: false, msg: 'Booking not found' });
 
@@ -80,47 +79,85 @@ exports.getBooking = async (req, res) => {
  */
 exports.createBooking = async (req, res) => {
     try {
-        const { car_id, provider, startDate, endDate } = req.body;
+        const { car_id, provider_id, startDate, endDate } = req.body;
 
-        if (!mongoose.Types.ObjectId.isValid(car_id))
+        // Validate car_id
+        if (!mongoose.Types.ObjectId.isValid(car_id)) {
             return res.status(400).json({ success: false, msg: 'Invalid car ID' });
-        if (!provider) return res.status(400).json({ success: false, msg: 'Provider is required' });
+        }
 
+        // Validate provider_id
+        if (!provider_id || !mongoose.Types.ObjectId.isValid(provider_id)) {
+            return res.status(400).json({ success: false, msg: 'Invalid provider ID' });
+        }
+
+        // Check car existence
         const car = await Car.findById(car_id);
         if (!car) return res.status(404).json({ success: false, msg: 'Car not found' });
 
+        // Check provider existence
+        const provider = await Provider.findById(provider_id);
+        if (!provider) return res.status(404).json({ success: false, msg: 'Provider not found' });
+
+        // Validate dates
         const start = new Date(startDate);
         const end = new Date(endDate);
-        if (end <= start)
+        if (end <= start) {
             return res.status(400).json({ success: false, msg: 'End date must be after start date' });
+        }
 
         // Check max 3 active bookings for user
         const activeBookings = await Booking.countDocuments({
             user: req.user._id,
             status: { $in: ['Pending', 'Confirmed'] }
         });
-        if (activeBookings >= 3)
+        if (activeBookings >= 3) {
             return res.status(403).json({ success: false, msg: 'Maximum 3 active bookings allowed' });
+        }
 
+        // 🔹 Check if the same user already has a pending booking for the same car
+        const pendingBooking = await Booking.findOne({
+            user: req.user._id,
+            car: car._id,
+            status: 'Pending'
+        });
+
+        if (pendingBooking) {
+            return res.status(409).json({
+                success: false,
+                msg: 'You already have a pending booking for this car'
+            });
+        }
+
+        // Calculate totalPrice
         const dayCount = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
         const totalPrice = car.pricePerDay * dayCount;
 
+        // Create booking
         const booking = await Booking.create({
             user: req.user._id,
             car: car._id,
-            provider,
+            provider: provider._id,
             startDate: start,
             endDate: end,
             totalPrice,
             status: 'Pending'
         });
 
-        res.status(201).json({ success: true, msg: 'Booking created', data: booking });
+        // Populate for response
+        const populatedBooking = await Booking.findById(booking._id)
+            .populate('user', 'name email')
+            .populate('car', 'name brand model')
+            .populate('provider', 'name address tel');
+
+        res.status(201).json({ success: true, msg: 'Booking created', data: populatedBooking });
+
     } catch (err) {
         logError(err, req, 'Create Booking');
         res.status(500).json({ success: false, msg: 'Internal server error' });
     }
 };
+
 
 /**
  * Update booking
@@ -136,16 +173,22 @@ exports.updateBooking = async (req, res) => {
         const booking = await Booking.findById(id);
         if (!booking) return res.status(404).json({ success: false, msg: 'Booking not found' });
 
-        if (req.user.role !== 'admin' && booking.user._id.toString() !== req.user._id.toString()) {
+        // Access control
+        if (req.user.role !== 'admin' && booking.user.toString() !== req.user._id.toString()) {
             return res.status(403).json({ success: false, msg: 'Access denied' });
         }
 
-        Object.assign(booking, req.body); // update fields
+        // Prevent updating status
+        const { status, ...updateFields } = req.body;
+
+        // Update other fields
+        Object.assign(booking, updateFields);
         await booking.save();
 
         const updatedBooking = await Booking.findById(id)
             .populate('user', 'name tel email')
-            .populate('car', 'name brand model pricePerDay');
+            .populate('car', 'name brand model pricePerDay')
+            .populate('provider', 'name address tel');
 
         res.status(200).json({ success: true, msg: 'Booking updated', data: updatedBooking });
     } catch (err) {
@@ -153,6 +196,7 @@ exports.updateBooking = async (req, res) => {
         res.status(500).json({ success: false, msg: 'Internal server error' });
     }
 };
+
 
 /**
  * Update booking status
@@ -209,11 +253,13 @@ exports.deleteBooking = async (req, res) => {
         const booking = await Booking.findById(id);
         if (!booking) return res.status(404).json({ success: false, msg: 'Booking not found' });
 
-        if (req.user.role !== 'admin' && booking.user._id.toString() !== req.user._id.toString()) {
+        if (req.user.role !== 'admin' && booking.user.toString() !== req.user._id.toString()) {
             return res.status(403).json({ success: false, msg: 'Access denied' });
         }
 
-        await booking.remove();
+        // แก้ตรงนี้
+        await booking.deleteOne();
+
         res.status(200).json({ success: true, msg: 'Booking deleted', data: booking });
     } catch (err) {
         logError(err, req, 'Delete Booking');

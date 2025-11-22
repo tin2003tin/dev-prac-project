@@ -66,6 +66,6 @@ router.route('/:id')
  *     security: [ { bearerAuth: [] } ]
  */
 router.route('/:id/status')
-    .put(protect, updateBookingStatus) // controller checks role and allowed status
+    .put(protect,  updateBookingStatus) // controller checks role and allowed status
 
 module.exports = router

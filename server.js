@@ -11,6 +11,7 @@ const authRoutes = require('./routes/auth')
 const usersRoutes = require('./routes/users')
 const bookingsRoutes = require('./routes/bookings')
 const carsRoutes = require('./routes/cars')
+const providersRoutes = require('./routes/providers')
 const reviewsRoutes = require('./routes/reviews')
 
 const app = express()
@@ -36,6 +37,7 @@ apiRouter.use('/users', usersRoutes)
 apiRouter.use('/bookings', bookingsRoutes)
 apiRouter.use('/cars', carsRoutes)
 apiRouter.use('/reviews', reviewsRoutes)
+apiRouter.use('/providers', providersRoutes)
 
 app.use('/api/v1', apiRouter)
 
