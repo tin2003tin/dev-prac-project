@@ -1,9 +1,11 @@
 const express = require('express')
 const dotenv = require('dotenv')
 const connectDB = require('./config/db')
-const cors = require('cors') // <-- import cors
+const cors = require('cors')
 
 dotenv.config({ path: 'config/config.env' })
+
+const { swaggerUi, swaggerSpec } = require('./config/swagger')
 
 const authRoutes = require('./routes/auth')
 const usersRoutes = require('./routes/users')
@@ -19,11 +21,13 @@ app.use(express.json())
 
 app.use(
     cors({
-        origin: 'http://localhost:3000', // your frontend URL
+        origin: 'http://localhost:3000',
         methods: ['GET', 'POST', 'PUT', 'DELETE'],
-        credentials: true, // allow cookies if needed
+        credentials: true,
     })
 )
+
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 
 const apiRouter = express.Router()
 

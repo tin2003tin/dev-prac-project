@@ -1,0 +1,26 @@
+@startuml
+actor User
+participant "Frontend" as FE
+participant "Review Router" as Route
+participant "Auth Middleware" as Auth
+participant "Review Controller" as Ctrl
+participant "Review Model" as Review
+participant "Car Model" as Car
+
+User -> FE : Write rating/comment
+FE -> Route : POST /api/v1/reviews
+Route -> Auth : protect()
+Auth -> UserModel : verify token
+UserModel --> Auth : OK
+Auth --> Route : allow
+
+Route -> Ctrl : addReview(req)
+Ctrl -> Car : findById(carId)
+Car --> Ctrl : car exists?
+
+Ctrl -> Review : create({ user, car, rating, comment })
+Review --> Ctrl : review saved
+
+Ctrl -> FE : 201 Review Created
+
+@enduml

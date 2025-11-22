@@ -1,0 +1,26 @@
+@startuml
+actor User
+participant "Frontend" as FE
+participant "Booking Router" as Route
+participant "Auth Middleware" as Auth
+participant "Booking Controller" as Ctrl
+participant "Booking Model" as Booking
+participant "Car Model" as Car
+
+User -> FE : Select car + date range
+FE -> Route : POST /api/v1/bookings
+Route -> Auth : protect()
+Auth -> UserModel : verify token
+UserModel --> Auth : user found
+Auth --> Route : allow
+
+Route -> Ctrl : createBooking(req)
+Ctrl -> Car : findById(carId)
+Car --> Ctrl : car details
+
+Ctrl -> Booking : create({ user, car, dateFrom, dateTo })
+Booking --> Ctrl : created booking
+
+Ctrl -> FE : 201 Booking Created
+
+@enduml

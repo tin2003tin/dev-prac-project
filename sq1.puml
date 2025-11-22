@@ -1,0 +1,26 @@
+@startuml
+actor User
+participant "Frontend (React)" as FE
+participant "Auth Router" as Route
+participant "Auth Controller" as Ctrl
+participant "User Model" as UserModel
+participant "JWT Service" as JWT
+
+User -> FE : Enter email/password
+FE -> Route : POST /api/v1/auth/login
+Route -> Ctrl : login(req)
+Ctrl -> UserModel : findOne({ email })
+UserModel --> Ctrl : user data
+
+Ctrl -> UserModel : comparePassword()
+UserModel --> Ctrl : valid/invalid
+
+alt valid password
+    Ctrl -> JWT : generateToken(userId)
+    JWT --> Ctrl : JWT Token
+    Ctrl -> FE : 200 OK + token
+else invalid password
+    Ctrl -> FE : 401 Unauthorized
+end
+
+@enduml
